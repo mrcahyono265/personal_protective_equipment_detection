@@ -1,0 +1,24 @@
+# Ignore all dataset folders anywhere in repo
+**/dataset/
+**/Personal-Protective-Equipment-2/
+
+# Ignore model weights
+*.h5
+*.pt
+*.pth
+*.pkl
+*.onnx
+*.json
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore virtual environments
+env/
+venv/
+.venv/
+
+# Ignore logs
+*.log
+logs/

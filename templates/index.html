@@ -1,0 +1,1089 @@
+<!-- templates/index.html - Frontend Dashboard (Refactored) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SiteGazer - Drone Safety Monitoring System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* ============================================
+           RESET & BASE STYLES - FIX SCROLLING ISSUES
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-sidebar: #111827;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f97316;
+            --accent-yellow: #f59e0b;
+            --border-color: #334155;
+            --modal-bg: rgba(0, 0, 0, 0.85);
+        }
+
+        /* ============================================
+           DESKTOP STYLES (min-width: 769px)
+           ============================================ */
+        @media (min-width: 769px) {
+            body {
+                background-color: var(--bg-dark);
+                color: var(--text-primary);
+                height: 100vh;
+                overflow: hidden; /* FIX: No scroll on desktop */
+            }
+
+            .dashboard-container {
+                display: flex;
+                height: 100vh; /* FIX: Full viewport height */
+                overflow: hidden; /* FIX: Prevent container scroll */
+            }
+
+            /* Left Panel - Video Stream */
+            .video-panel {
+                flex: 0 0 70%;
+                padding: 20px;
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+                overflow: hidden; /* FIX: No scroll in video panel */
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* Right Panel - Live Log */
+            .log-panel {
+                flex: 0 0 30%;
+                background: var(--bg-sidebar);
+                padding: 20px;
+                border-left: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                overflow: hidden; /* FIX: Container doesn't scroll */
+            }
+
+            .log-container {
+                flex: 1;
+                overflow-y: auto; /* FIX: Only log container scrolls internally */
+                padding-right: 5px;
+                max-height: calc(100vh - 250px); /* Limit height */
+            }
+        }
+
+        /* ============================================
+           MOBILE/TABLET STYLES (max-width: 768px)
+           ============================================ */
+        @media (max-width: 768px) {
+            body {
+                background-color: var(--bg-dark);
+                color: var(--text-primary);
+                overflow-y: auto; /* FIX: Allow scroll on mobile */
+                min-height: 100vh;
+            }
+
+            .dashboard-container {
+                display: flex;
+                flex-direction: column;
+                min-height: 100vh;
+            }
+
+            .video-panel {
+                padding: 15px;
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+                flex: none;
+            }
+
+            .log-panel {
+                background: var(--bg-sidebar);
+                padding: 15px;
+                border-top: 1px solid var(--border-color);
+                flex: 1;
+            }
+
+            .log-container {
+                overflow-y: auto;
+                max-height: 400px;
+            }
+        }
+
+        /* ============================================
+           COMMON STYLES (Both Desktop & Mobile)
+           ============================================ */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo i {
+            color: var(--accent-blue);
+            font-size: 28px;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+            aspect-ratio: 16/9;
+            flex-shrink: 0;
+        }
+
+        #videoStream {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .zone-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .zone-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px 20px;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .zone-btn:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-blue);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .zone-btn.active {
+            background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+            border-color: transparent;
+        }
+
+        .zone-btn i {
+            font-size: 18px;
+        }
+
+        .log-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .log-header i {
+            color: var(--accent-blue);
+            font-size: 22px;
+        }
+
+        .log-header h2 {
+            font-size: 20px;
+        }
+
+        .log-count {
+            margin-left: auto;
+            background: var(--bg-card);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Custom Scrollbar */
+        .log-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: var(--bg-card);
+            border-radius: 3px;
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background: var(--accent-blue);
+            border-radius: 3px;
+        }
+
+        /* ============================================
+           LOG CARD STYLES with IMAGE SUPPORT
+           ============================================ */
+        .log-card {
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid;
+            animation: slideIn 0.3s ease-out;
+            transition: transform 0.2s;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-card:hover {
+            transform: translateX(-5px);
+        }
+
+        .log-card.critical {
+            border-left-color: var(--accent-red);
+        }
+
+        .log-card.violation {
+            border-left-color: var(--accent-orange);
+        }
+
+        .log-card.distracted {
+            border-left-color: var(--accent-yellow);
+        }
+
+        .log-card.safe {
+            border-left-color: var(--accent-green);
+        }
+
+        .log-card.info {
+            border-left-color: var(--accent-blue);
+        }
+
+        .log-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .log-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .log-status {
+            font-weight: 600;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .log-person {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .log-zone {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        /* ============================================
+           SNAPSHOT THUMBNAIL STYLES
+           ============================================ */
+        .snapshot-container {
+            margin-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 10px;
+        }
+
+        .snapshot-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .snapshot-thumbnail {
+            width: 100%;
+            max-width: 200px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .snapshot-thumbnail:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+            border-color: var(--accent-blue);
+        }
+
+        /* ============================================
+           MODAL STYLES FOR FULL-SIZE IMAGE
+           ============================================ */
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--modal-bg);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-image {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 0.3s;
+        }
+
+        .modal-close:hover {
+            background: var(--accent-red);
+        }
+
+        .modal-info {
+            padding: 15px;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .modal-info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .modal-info-label {
+            color: var(--text-secondary);
+        }
+
+        .modal-info-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* ============================================
+           SYSTEM STATS & LOADING STATES
+           ============================================ */
+        .system-stats {
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            flex-shrink: 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 15px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(59, 130, 246, 0.2);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ============================================
+           CAMERA CONFIG STYLES
+           ============================================ */
+        .camera-config {
+            margin-top: 15px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .config-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .config-input {
+            flex: 1;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .config-btn {
+            padding: 10px 20px;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .config-btn:hover {
+            background: #2563eb;
+        }
+
+        .config-help {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        /* ============================================
+           RESPONSIVE ADJUSTMENTS
+           ============================================ */
+        @media (max-width: 480px) {
+            .logo h1 {
+                font-size: 20px;
+            }
+            
+            .zone-controls {
+                flex-direction: column;
+            }
+            
+            .zone-btn {
+                min-width: 100%;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .log-content {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .log-person {
+                align-self: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Modal untuk menampilkan gambar full-size -->
+    <div class="image-modal" id="imageModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <img class="modal-image" id="modalImage" src="" alt="Full Size Snapshot">
+            <div class="modal-info">
+                <div class="modal-info-row">
+                    <span class="modal-info-label">Timestamp:</span>
+                    <span class="modal-info-value" id="modalTimestamp">--:--:--</span>
+                </div>
+                <div class="modal-info-row">
+                    <span class="modal-info-label">Status:</span>
+                    <span class="modal-info-value" id="modalStatus">Unknown</span>
+                </div>
+                <div class="modal-info-row">
+                    <span class="modal-info-label">Zone:</span>
+                    <span class="modal-info-value" id="modalZone">Unknown Zone</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-container">
+        <!-- Left Panel: Video Stream -->
+        <div class="video-panel">
+            <div class="header">
+                <div class="logo">
+                    <i class="fas fa-drone"></i>
+                    <h1>SiteGazer AI</h1>
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span>Live Monitoring Active</span>
+                </div>
+            </div>
+
+            <div class="video-container">
+                <img id="videoStream" src="/video_feed" alt="Live Video Feed">
+                <div class="loading" id="loadingIndicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Starting video stream...</p>
+                </div>
+            </div>
+
+            <div class="camera-config">
+                <div class="config-row">
+                    <input type="text" id="cameraSource" class="config-input" 
+                           placeholder="Camera source (0 for webcam or IP camera URL)" 
+                           value="0">
+                    <button class="config-btn" onclick="updateCameraSource()">
+                        <i class="fas fa-sync-alt"></i> Update
+                    </button>
+                </div>
+                <div class="config-help">
+                    Examples: "0" for default webcam, "http://192.168.1.5:4747/video" for DroidCam
+                </div>
+            </div>
+
+            <div class="zone-controls">
+                <button class="zone-btn" onclick="changeZone('Lobby')">
+                    <i class="fas fa-building"></i>
+                    Zone: Lobby
+                </button>
+                <button class="zone-btn" onclick="changeZone('Warehouse')">
+                    <i class="fas fa-warehouse"></i>
+                    Zone: Warehouse
+                </button>
+                <button class="zone-btn" onclick="changeZone('Site')">
+                    <i class="fas fa-hard-hat"></i>
+                    Zone: Site
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Live Security Log -->
+        <div class="log-panel">
+            <div class="log-header">
+                <i class="fas fa-shield-alt"></i>
+                <h2>Live Security Log</h2>
+                <div class="log-count" id="logCount">0</div>
+            </div>
+
+            <div class="log-container" id="logContainer">
+                <!-- Log entries will be dynamically inserted here -->
+                <div class="log-card info">
+                    <div class="log-time">
+                        <i class="far fa-clock"></i>
+                        <span id="currentTime">--:--:--</span>
+                    </div>
+                    <div class="log-content">
+                        <div class="log-status">System Initialized</div>
+                    </div>
+                    <div class="log-zone">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Zone: <span id="currentZoneDisplay">Unknown Zone</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="system-stats">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalDetections">0</div>
+                        <div class="stat-label">Total Detections</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="criticalCount">0</div>
+                        <div class="stat-label">Critical Alerts</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="snapshotCount">0</div>
+                        <div class="stat-label">Snapshots Saved</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="activePersons">0</div>
+                        <div class="stat-label">Active Persons</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // MODAL FUNCTIONS
+        // ============================================
+        function openModal(imageUrl, timestamp, status, zone) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            const modalTimestamp = document.getElementById('modalTimestamp');
+            const modalStatus = document.getElementById('modalStatus');
+            const modalZone = document.getElementById('modalZone');
+            
+            modalImage.src = imageUrl;
+            modalTimestamp.textContent = timestamp;
+            modalStatus.textContent = status;
+            modalZone.textContent = zone;
+            
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('imageModal');
+            modal.style.display = 'none';
+            document.body.style.overflow = ''; // Restore scroll
+        }
+
+        // Close modal on ESC key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // Close modal when clicking outside image
+        document.getElementById('imageModal').addEventListener('click', (e) => {
+            if (e.target.id === 'imageModal') {
+                closeModal();
+            }
+        });
+
+        // ============================================
+        // CORE FUNCTIONS
+        // ============================================
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = 
+                now.toLocaleTimeString('en-US', {hour12: false});
+        }
+        
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Zone change function
+        async function changeZone(zoneName) {
+            try {
+                // Update button states
+                document.querySelectorAll('.zone-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.textContent.includes(zoneName)) {
+                        btn.classList.add('active');
+                    }
+                });
+                
+                // Call API to change zone
+                const response = await fetch(`/set_zone/${zoneName}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Update display
+                    document.getElementById('currentZoneDisplay').textContent = zoneName;
+                    
+                    // Show success feedback
+                    addLogEntry({
+                        timestamp: new Date().toLocaleTimeString('en-US', {hour12: false}),
+                        zone: zoneName,
+                        status: 'ZONE CHANGED',
+                        person_id: 0,
+                        image_url: null
+                    }, 'info');
+                }
+            } catch (error) {
+                console.error('Error changing zone:', error);
+            }
+        }
+
+        // Camera source update function
+        async function updateCameraSource() {
+            const cameraSource = document.getElementById('cameraSource').value.trim();
+            if (!cameraSource) {
+                alert('Please enter a camera source');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/update_camera_source', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ source: cameraSource })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    alert(`Camera source updated to: ${cameraSource}`);
+                    // Restart video stream
+                    document.getElementById('videoStream').src = '/video_feed?' + new Date().getTime();
+                    
+                    // Add log entry
+                    addLogEntry({
+                        timestamp: new Date().toLocaleTimeString('en-US', {hour12: false}),
+                        zone: document.getElementById('currentZoneDisplay').textContent,
+                        status: `CAMERA SOURCE: ${cameraSource}`,
+                        person_id: 0,
+                        image_url: null
+                    }, 'info');
+                }
+            } catch (error) {
+                console.error('Error updating camera source:', error);
+                alert('Failed to update camera source');
+            }
+        }
+
+        // Load current camera source on startup
+        async function loadCameraSource() {
+            try {
+                const response = await fetch('/current_camera_source');
+                const data = await response.json();
+                
+                if (data.camera_source) {
+                    document.getElementById('cameraSource').value = data.camera_source;
+                }
+            } catch (error) {
+                console.error('Error loading camera source:', error);
+            }
+        }
+
+        // Add log entry to the UI with image support
+        function addLogEntry(log, className = 'info') {
+            const logContainer = document.getElementById('logContainer');
+            
+            // Determine CSS class based on status
+            let logClass = 'info';
+            if (log.status.includes('CRITICAL')) logClass = 'critical';
+            else if (log.status.includes('VIOLATION')) logClass = 'violation';
+            else if (log.status.includes('DISTRACTED')) logClass = 'distracted';
+            else if (log.status.includes('SAFE')) logClass = 'safe';
+            
+            // Create log card
+            const logCard = document.createElement('div');
+            logCard.className = `log-card ${logClass}`;
+            
+            // Build HTML content
+            let logHTML = `
+                <div class="log-time">
+                    <i class="far fa-clock"></i>
+                    <span>${log.timestamp}</span>
+                </div>
+                <div class="log-content">
+                    <div class="log-status">${log.status}</div>
+                    ${log.person_id > 0 ? `<div class="log-person">Person ${log.person_id}</div>` : ''}
+                </div>
+                <div class="log-zone">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>Zone: ${log.zone}</span>
+                </div>
+            `;
+            
+            // Add snapshot thumbnail if image_url exists
+            if (log.image_url) {
+                logHTML += `
+                    <div class="snapshot-container">
+                        <div class="snapshot-label">
+                            <i class="fas fa-camera"></i>
+                            Violation Snapshot:
+                        </div>
+                        <img src="${log.image_url}" 
+                             alt="Violation Snapshot" 
+                             class="snapshot-thumbnail"
+                             onclick="openModal('${log.image_url}', '${log.timestamp}', '${log.status}', '${log.zone}')">
+                    </div>
+                `;
+            }
+            
+            logCard.innerHTML = logHTML;
+            
+            // Insert at the top
+            logContainer.insertBefore(logCard, logContainer.firstChild);
+            
+            // Limit to 50 log entries
+            const allLogs = logContainer.querySelectorAll('.log-card');
+            if (allLogs.length > 50) {
+                logContainer.removeChild(allLogs[allLogs.length - 1]);
+            }
+            
+            // Update counters
+            updateCounters();
+            
+            // Scroll to top
+            logContainer.scrollTop = 0;
+        }
+
+        // Update counters
+        function updateCounters() {
+            const logContainer = document.getElementById('logContainer');
+            const logs = logContainer.querySelectorAll('.log-card');
+            
+            document.getElementById('logCount').textContent = logs.length;
+            
+            // Count critical alerts
+            const criticalCount = Array.from(logs).filter(log => 
+                log.classList.contains('critical')
+            ).length;
+            
+            // Count snapshots (logs with images)
+            const snapshotCount = Array.from(logs).filter(log => 
+                log.querySelector('.snapshot-thumbnail') !== null
+            ).length;
+            
+            // Count active persons in current logs
+            const activePersons = Array.from(logs).filter(log => 
+                !log.classList.contains('info') && 
+                !log.textContent.includes('ZONE CHANGED') &&
+                !log.textContent.includes('CAMERA SOURCE')
+            ).length;
+            
+            document.getElementById('criticalCount').textContent = criticalCount;
+            document.getElementById('totalDetections').textContent = logs.length - 1; // Subtract system log
+            document.getElementById('snapshotCount').textContent = snapshotCount;
+            document.getElementById('activePersons').textContent = Math.min(activePersons, 10); // Cap at 10 for display
+        }
+
+        // Fetch logs from server periodically
+        async function fetchLogs() {
+            try {
+                const response = await fetch('/get_logs');
+                const data = await response.json();
+                
+                if (data.logs && data.logs.length > 0) {
+                    // Get current logs count to avoid duplicates
+                    const currentLogs = document.querySelectorAll('.log-card').length;
+                    
+                    // Only add new logs (comparing with what we already have)
+                    data.logs.slice(0, 5).forEach(log => {
+                        // Check if this log already exists
+                        const exists = Array.from(document.querySelectorAll('.log-time span'))
+                            .some(timeSpan => timeSpan.textContent === log.timestamp && 
+                                  document.querySelector('.log-status').textContent === log.status);
+                        
+                        if (!exists) {
+                            addLogEntry(log);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching logs:', error);
+            }
+        }
+
+        // Fetch snapshot stats
+        async function fetchSnapshotStats() {
+            try {
+                const response = await fetch('/snapshot_stats');
+                const data = await response.json();
+                
+                if (data.total_snapshots) {
+                    // Update counter in stats grid
+                    const snapshotElement = document.getElementById('snapshotCount');
+                    if (snapshotElement) {
+                        snapshotElement.textContent = data.total_snapshots;
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching snapshot stats:', error);
+            }
+        }
+
+        // Get current zone on load
+        async function loadCurrentZone() {
+            try {
+                const response = await fetch('/current_zone');
+                const data = await response.json();
+                
+                if (data.current_zone) {
+                    document.getElementById('currentZoneDisplay').textContent = data.current_zone;
+                    
+                    // Activate corresponding button
+                    document.querySelectorAll('.zone-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                        if (btn.textContent.includes(data.current_zone)) {
+                            btn.classList.add('active');
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading current zone:', error);
+            }
+        }
+
+        // Video stream error handling
+        const videoStream = document.getElementById('videoStream');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        
+        videoStream.onloadstart = () => {
+            loadingIndicator.style.display = 'flex';
+        };
+        
+        videoStream.onload = () => {
+            loadingIndicator.style.display = 'none';
+        };
+        
+        videoStream.onerror = () => {
+            loadingIndicator.style.display = 'flex';
+            loadingIndicator.innerHTML = `
+                <div class="spinner"></div>
+                <p>Connection lost. Reconnecting...</p>
+            `;
+            
+            // Try to reconnect after 3 seconds
+            setTimeout(() => {
+                videoStream.src = '/video_feed?' + new Date().getTime();
+            }, 3000);
+        };
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCurrentZone();
+            loadCameraSource();
+            updateCounters();
+            
+            // Fetch logs every 2 seconds
+            setInterval(fetchLogs, 2000);
+            
+            // Fetch snapshot stats every 10 seconds
+            setInterval(fetchSnapshotStats, 10000);
+            
+            // Initial fetches
+            fetchLogs();
+            fetchSnapshotStats();
+            
+            // Handle window resize for responsive behavior
+            window.addEventListener('resize', () => {
+                // Force reflow for scroll containers on resize
+                const logContainer = document.getElementById('logContainer');
+                if (logContainer) {
+                    logContainer.style.overflowY = 'auto';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
