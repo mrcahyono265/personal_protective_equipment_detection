@@ -20,7 +20,7 @@ import uuid
 # KONFIGURASI KAMERA
 # ============================
 # Ganti dengan URL DroidCam Anda
-CAMERA_SOURCE = "2" 
+CAMERA_SOURCE = "0" 
 
 # ============================
 # KONFIGURASI SISTEM
