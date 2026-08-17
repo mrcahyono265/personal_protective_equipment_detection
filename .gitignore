@@ -9,6 +9,7 @@
 *.pkl
 *.onnx
 *.json
+*.engine
 
 # Ignore Python cache
 __pycache__/
@@ -25,4 +26,9 @@ logs/
 
 # Ignore drone captures
 captures/
-templates/
+
+# Ignore violation snapshots (bukti pelanggaran, bukan untuk publik)
+static/snapshots/
+
+# Playwright MCP artifacts (snapshot/console output)
+.playwright-mcp/

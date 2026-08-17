@@ -1,8 +1,5 @@
-import ctypes
-import ctypes.wintypes as w
+import os
 import time
-
-user32 = ctypes.windll.user32
 
 VK_W, VK_A, VK_S, VK_D = 0x57, 0x41, 0x53, 0x44
 VK_UP, VK_DOWN = 0x26, 0x28
@@ -14,46 +11,58 @@ VK_Q, VK_E = 0x51, 0x45
 VK_C, VK_X = 0x43, 0x58
 VK_G, VK_R = 0x47, 0x52
 
+# Keyboard + gamepad (XInput) Windows-only. Di Linux/CI input nonaktif
+# (drone tetap bisa dipakai via remote fisik di mode pasif e99).
+if os.name == "nt":
+    import ctypes
+    import ctypes.wintypes as w
 
-def held(vk):
-    return user32.GetAsyncKeyState(vk) & 0x8000 != 0
+    user32 = ctypes.windll.user32
 
+    def held(vk):
+        return user32.GetAsyncKeyState(vk) & 0x8000 != 0
 
-class XINPUT_GAMEPAD(ctypes.Structure):
-    _fields_ = [
-        ('wButtons', w.WORD),
-        ('bLeftTrigger', ctypes.c_ubyte),
-        ('bRightTrigger', ctypes.c_ubyte),
-        ('sThumbLX', ctypes.c_short),
-        ('sThumbLY', ctypes.c_short),
-        ('sThumbRX', ctypes.c_short),
-        ('sThumbRY', ctypes.c_short),
-    ]
+    class XINPUT_GAMEPAD(ctypes.Structure):
+        _fields_ = [
+            ('wButtons', w.WORD),
+            ('bLeftTrigger', ctypes.c_ubyte),
+            ('bRightTrigger', ctypes.c_ubyte),
+            ('sThumbLX', ctypes.c_short),
+            ('sThumbLY', ctypes.c_short),
+            ('sThumbRX', ctypes.c_short),
+            ('sThumbRY', ctypes.c_short),
+        ]
 
+    class XINPUT_STATE(ctypes.Structure):
+        _fields_ = [('dwPacketNumber', w.DWORD), ('Gamepad', XINPUT_GAMEPAD)]
 
-class XINPUT_STATE(ctypes.Structure):
-    _fields_ = [('dwPacketNumber', w.DWORD), ('Gamepad', XINPUT_GAMEPAD)]
+    _BTN = {
+        'A': 0x1000, 'B': 0x2000,
+        'BACK': 0x0020, 'START': 0x0010,
+        'DPAD_LEFT': 0x0004, 'DPAD_RIGHT': 0x0008,
+        'LB': 0x0100, 'RB': 0x0200,
+    }
 
+    def _load_xinput():
+        for name in ('xinput1_4.dll', 'xinput1_3.dll', 'xinput9_1_0.dll'):
+            try:
+                return ctypes.windll.LoadLibrary(name)
+            except OSError:
+                pass
+        return None
 
-_BTN = {
-    'A': 0x1000, 'B': 0x2000,
-    'BACK': 0x0020, 'START': 0x0010,
-    'DPAD_LEFT': 0x0004, 'DPAD_RIGHT': 0x0008,
-    'LB': 0x0100, 'RB': 0x0200,
-}
+    class XINPUT_VIBRATION(ctypes.Structure):
+        _fields_ = [('wLeftMotorSpeed', w.WORD), ('wRightMotorSpeed', w.WORD)]
 
+else:
+    user32 = None
+    _BTN = {}
 
-def _load_xinput():
-    for name in ('xinput1_4.dll', 'xinput1_3.dll', 'xinput9_1_0.dll'):
-        try:
-            return ctypes.windll.LoadLibrary(name)
-        except OSError:
-            pass
-    return None
+    def held(vk):
+        return False
 
-
-class XINPUT_VIBRATION(ctypes.Structure):
-    _fields_ = [('wLeftMotorSpeed', w.WORD), ('wRightMotorSpeed', w.WORD)]
+    def _load_xinput():
+        return None
 
 
 class InputState:

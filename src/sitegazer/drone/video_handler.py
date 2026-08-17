@@ -2,13 +2,13 @@ import cv2
 import os
 import time
 from datetime import datetime
-from drone.config import PHOTO_DIR, VIDEO_DIR, BATTERY_WARN, BATTERY_CRITICAL
+from sitegazer import config
 
 
 class VideoHandler:
     def __init__(self):
-        os.makedirs(PHOTO_DIR, exist_ok=True)
-        os.makedirs(VIDEO_DIR, exist_ok=True)
+        os.makedirs(config.PHOTO_DIR, exist_ok=True)
+        os.makedirs(config.VIDEO_DIR, exist_ok=True)
         self._recording = False
         self._rec_start = 0
         self._writer = None
@@ -60,8 +60,8 @@ class VideoHandler:
             bat_col = (128, 128, 128)
             bat_text = 'BAT --'
         else:
-            bat_col = (0, 0, 255) if battery <= BATTERY_CRITICAL else (
-                (0, 255, 255) if battery <= BATTERY_WARN else (255, 255, 255)
+            bat_col = (0, 0, 255) if battery <= config.BATTERY_CRITICAL else (
+                (0, 255, 255) if battery <= config.BATTERY_WARN else (255, 255, 255)
             )
             bat_text = f'BAT {battery}%'
         cv2.putText(frame, bat_text, (10, 42),
@@ -102,7 +102,7 @@ class VideoHandler:
 
         self.draw_drone_state(frame, lr, fb, ud, yaw)
 
-        if battery is not None and battery <= BATTERY_CRITICAL:
+        if battery is not None and battery <= config.BATTERY_CRITICAL:
             red = frame.copy()
             cv2.rectangle(red, (0, 0), (w, h), (0, 0, 255), -1)
             cv2.addWeighted(red, 0.2, frame, 0.8, 0, frame)
@@ -112,7 +112,7 @@ class VideoHandler:
             y = h // 2
             cv2.putText(frame, text, (x, y),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-        elif battery is not None and battery <= BATTERY_WARN:
+        elif battery is not None and battery <= config.BATTERY_WARN:
             cv2.putText(frame, 'LOW BATTERY', (w - 130, 42),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
@@ -120,7 +120,7 @@ class VideoHandler:
 
     def capture_photo(self, frame):
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        cv2.imwrite(f'{PHOTO_DIR}/drone_{ts}.jpg', frame)
+        cv2.imwrite(f'{config.PHOTO_DIR}/drone_{ts}.jpg', frame)
         self.photo_count += 1
 
     def toggle_recording(self, frame_shape):
@@ -134,7 +134,7 @@ class VideoHandler:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         h, w = shape[:2]
         self._writer = cv2.VideoWriter(
-            f'{VIDEO_DIR}/drone_{ts}.mp4', fourcc, 20.0, (w, h)
+            f'{config.VIDEO_DIR}/drone_{ts}.mp4', fourcc, 20.0, (w, h)
         )
         self._recording = True
         self._rec_start = time.time()

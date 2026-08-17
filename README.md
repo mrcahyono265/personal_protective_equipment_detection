@@ -19,8 +19,8 @@ SiteGazer adalah sistem pemantauan keselamatan kerja (K3) berbasis kecerdasan bu
 
 ## 🛠️ Tech Stack
 
-- **Deep Learning Framework:** PyTorch 2.9.1
-- **Object Detection Model:** YOLOv11 (Ultralytics)
+- **Deep Learning Framework:** PyTorch + Ultralytics
+- **Object Detection Model:** YOLOv11n (Ultralytics)
 - **Backend API:** FastAPI & Uvicorn
 - **Computer Vision:** OpenCV (`cv2`)
 - **Frontend Dashboard:** HTML5, CSS3, Vanilla JavaScript, FontAwesome
@@ -29,10 +29,10 @@ SiteGazer adalah sistem pemantauan keselamatan kerja (K3) berbasis kecerdasan bu
 
 ## ✨ Key Features
 
-- **Single Model PPE Detection:** Model AI terlatih yang mampu mengenali 6 kelas secara akurat (Gloves, Helmet, Vest, No-gloves, No-Helmet, No-vest).
+- **Single Model PPE Detection:** Model AI terlatih (YOLOv11n) yang mampu mengenali kelas APD (helm, rompi) beserta negatifnya (No-Helmet, No-Vest).
 - **Buffer-less Video Streaming:** Kelas `VideoCamera` khusus menggunakan *threading* untuk membaca *frame* terakhir dari kamera, memastikan aliran video *real-time* tanpa penumpukan *delay* (*lag*).
-- **Automated Violation Snapshot:** Sistem memiliki logika prapemrosesan yang hanya mengklasifikasikan "Pelanggaran" jika mendeteksi ketiadaan APD (seperti *No-Helmet*). Sistem kemudian otomatis menyimpan gambar kejadian beserta label waktu dan zonanya.
-- **Dynamic Camera Configuration:** Pengguna dapat mengganti sumber video secara langsung dari antarmuka *dashboard* (misalnya dari *webcam* lokal '0' ke IP Camera DroidCam).
+- **Automated Violation Snapshot:** Sistem hanya mengklasifikasikan "Pelanggaran" jika mendeteksi ketiadaan APD (seperti *No-Helmet*), lalu otomatis menyimpan gambar kejadian beserta label waktu dan zonanya ke `static/snapshots/`.
+- **Multi-Camera & Drone Support:** Tiga sumber kamera — `webcam` (kamera lokal/IP), `tello` (DJI Tello, kontrol penuh), dan `e99` (E88 Pro/E99, pasif) — dipilih via konfigurasi.
 - **Interactive Security Log:** Panel *log* keamanan *real-time* di sisi antarmuka yang menampilkan riwayat kejadian, statistik peringatan kritis, dan jumlah tangkapan layar, lengkap dengan modal untuk melihat gambar *full-size*.
 
 ---
@@ -40,18 +40,27 @@ SiteGazer adalah sistem pemantauan keselamatan kerja (K3) berbasis kecerdasan bu
 ## 📁 Project Structure
 
 ```bash
-├── templates/
-│   ├── index.html            # Frontend Dashboard K3
-│   └── snapshots/            # Direktori penyimpanan otomatis bukti pelanggaran
-├── drone/                     # Modul drone: tello_drone (Tello), e99_drone (E88 Pro), input, video, config
-├── tests/                    # Self-check logika kontrol drone
+├── app.py                    # Entry point (shim: menambahkan src/ ke path, memanggil sitegazer.api.main)
+├── src/sitegazer/            # Paket utama
+│   ├── api.py                # FastAPI: lifespan, streaming, endpoint (termasuk /current_zone)
+│   ├── config.py             # Semua konstanta (kamera, model, drone) + override env var
+│   ├── camera.py             # VideoCamera (buffer-less) & DroneCamera (adapter)
+│   ├── detection.py          # Klasifikasi APD, snapshot bukti, proses frame
+│   ├── controller.py         # Thread kontrol drone (keyboard + gamepad)
+│   └── drone/                # tello_drone (Tello), e99_drone (E88 Pro/E99),
+│                             # input_handler (Windows), video_handler (HUD & rekaman)
+├── static/                   # Aset frontend
+│   ├── css/style.css         # Semua styling dashboard
+│   ├── js/app.js             # Semua logika frontend
+│   └── snapshots/            # Bukti pelanggaran (auto-generated, di-ignore git)
+├── templates/index.html      # Markup dashboard (HTML murni)
+├── models/                   # Bobot model (di-ignore git, lihat models/README.md)
+├── tests/                    # Self-check (tanpa framework): config, detection
 ├── captures/                 # Foto & rekaman drone (auto-generated)
 ├── runs/                     # Log hasil validasi Ultralytics
-├── yolo11_ppe/               # Direktori penyimpanan model, log training, dan metrik (train_v1)
-├── app.py                    # Script Backend utama FastAPI
+├── yolo11_ppe/               # Log training & metrik (train_v1)
+├── setup.bat / setup.sh      # Setup satu kali (venv + install dependensi)
 ├── requirements.txt          # Dependensi Python
-├── best_ppe_yolo11n.pt       # Bobot model terbaik YOLOv11 untuk deteksi APD
-├── yolo11n.pt                # Pre-trained weights awal YOLOv11
 ├── model_metadata.json       # Metadata informasi model hasil training
 └── train.ipynb               # Jupyter notebook untuk training, evaluasi, dan ekspor model
 ```
@@ -74,27 +83,40 @@ Pastikan sistem Anda telah menginstal perangkat lunak berikut:
 git clone https://github.com/mrcahyono265/personal_protective_equipment_detection.git
 cd personal_protective_equipment_detection
 
-# Membuat dan mengaktifkan virtual environment
-python -m venv venv
-source venv/bin/activate  # Untuk Linux/Mac
-venv\Scripts\activate     # Untuk Windows
+# Setup satu kali: buat venv + install dependensi
+./setup.sh        # Linux/Mac
+setup.bat         # Windows
 ```
 
-### 2. Instalasi Dependensi
+Atau manual: `python -m venv venv`, aktifkan venv, lalu `pip install -r requirements.txt`.
 
-```bash
-pip install -r requirements.txt
-```
+### 2. Menjalankan Dashboard Deteksi (Inference)
 
-### 3. Menjalankan Dashboard Deteksi (Inference)
-
-Pastikan model best_ppe_yolo11n.pt berada di root directory, lalu jalankan server FastAPI:
+Taruh model `best_ppe_yolo11n.pt` di folder `models/` (lihat `models/README.md`), lalu:
 
 ```bash
 python app.py
 ```
 
 Akses dashboard pemantauan melalui browser di tautan: `http://localhost:8000/`
+
+### 3. Konfigurasi
+
+Semua pengaturan ada di `src/sitegazer/config.py` (ubah langsung), atau override lewat environment variable tanpa menyentuh kode:
+
+```bash
+SITEGAZER_CAMERA=e99 python app.py        # pilih sumber kamera: webcam | tello | e99
+SITEGAZER_CAMERA_SOURCE=0 python app.py   # hanya untuk webcam (0 atau URL IP camera)
+SITEGAZER_MODEL=models/best_ppe_yolo11n.pt
+SITEGAZER_PORT=8000
+```
+
+### 4. Testing
+
+```bash
+python tests/test_config.py      # > all ok
+python tests/test_detection.py   # > all ok
+```
 
 ---
 
@@ -105,11 +127,10 @@ Sistem mendukung **DJI Tello** sebagai sumber kamera sekaligus dapat dikontrol p
 ### Setup
 
 1. Sambungkan Wi-Fi ke **Tello-XXXXXX** (internet akan mati selama terhubung — normal).
-2. Di `app.py`, ubah konstanta:
+2. Ubah konstanta `CAMERA_TYPE` di `src/sitegazer/config.py` (atau set env var):
 
 ```python
 CAMERA_TYPE = "tello"   # "webcam" | "tello" | "e99"
-CAMERA_SOURCE = "0"     # hanya dipakai jika CAMERA_TYPE = "webcam"
 ```
 
 3. Jalankan seperti biasa: `python app.py`
@@ -168,17 +189,12 @@ Mendukung drone murah keluarga **E88 Pro / E99** sebagai sumber kamera. Mode ini
 ### Setup
 
 1. Sambungkan Wi-Fi ke **drone (192.168.1.1)** — remote fisik tetap bisa terbang karena RF, tidak konflik dengan Wi-Fi.
-2. Di `app.py`:
-
-```python
-CAMERA_TYPE = "e99"
-```
-
+2. Ubah konstanta `CAMERA_TYPE` di `src/sitegazer/config.py` (atau set env var `SITEGAZER_CAMERA=e99`).
 3. Jalankan: `python app.py`
 
 ### Karakteristik Mode E99
 
-- Video RTSP (`rtsp://192.168.1.1:7070/webcam`) dibaca via OpenCV, dirotasi 90° CW (sesuai orientasi kamera drone; matikan via `ROTATE = False` di `drone/e99_drone.py`).
+- Video RTSP (`rtsp://192.168.1.1:7070/webcam`) dibaca via OpenCV, dirotasi 90° CW (sesuai orientasi kamera drone; matikan via `ROTATE = False` di `src/sitegazer/drone/e99_drone.py`).
 - **Tanpa telemetri**: HUD menampilkan `BAT --`, `ALT --`, `TM --`; **auto-land baterai tidak berlaku** (tidak ada API baterai).
 - Tombol **Q** (foto) & **E** (rekam) aktif dari keyboard mesin server; tombol kontrol terbang (Space/WASD dll.) tidak berlaku.
 - Deteksi APD, log pelanggaran, snapshot, dan zona berfungsi sama seperti mode lain.
