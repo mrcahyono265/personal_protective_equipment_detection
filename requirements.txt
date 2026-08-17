@@ -1,0 +1,8 @@
+ultralytics
+fastapi
+uvicorn
+opencv-python
+pydantic
+djitellopy>=2.4.0
+# av>=18 diblokir Windows Security (DLL) - lihat README troubleshooting
+av>=11,<18

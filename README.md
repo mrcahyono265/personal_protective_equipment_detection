@@ -43,9 +43,13 @@ SiteGazer adalah sistem pemantauan keselamatan kerja (K3) berbasis kecerdasan bu
 ├── templates/
 │   ├── index.html            # Frontend Dashboard K3
 │   └── snapshots/            # Direktori penyimpanan otomatis bukti pelanggaran
+├── drone/                     # Modul drone: tello_drone (Tello), e99_drone (E88 Pro), input, video, config
+├── tests/                    # Self-check logika kontrol drone
+├── captures/                 # Foto & rekaman drone (auto-generated)
 ├── runs/                     # Log hasil validasi Ultralytics
 ├── yolo11_ppe/               # Direktori penyimpanan model, log training, dan metrik (train_v1)
 ├── app.py                    # Script Backend utama FastAPI
+├── requirements.txt          # Dependensi Python
 ├── best_ppe_yolo11n.pt       # Bobot model terbaik YOLOv11 untuk deteksi APD
 ├── yolo11n.pt                # Pre-trained weights awal YOLOv11
 ├── model_metadata.json       # Metadata informasi model hasil training
@@ -79,8 +83,7 @@ venv\Scripts\activate     # Untuk Windows
 ### 2. Instalasi Dependensi
 
 ```bash
-# Gunakan list requirement di atas atau install secara manual
-pip install ultralytics fastapi uvicorn opencv-python pydantic
+pip install -r requirements.txt
 ```
 
 ### 3. Menjalankan Dashboard Deteksi (Inference)
@@ -92,6 +95,93 @@ python app.py
 ```
 
 Akses dashboard pemantauan melalui browser di tautan: `http://localhost:8000/`
+
+---
+
+## 🚁 Mode Drone DJI Tello
+
+Sistem mendukung **DJI Tello** sebagai sumber kamera sekaligus dapat dikontrol penuh (keyboard fisik + gamepad XInput, Windows) selama patroli. Deteksi APD berjalan pada video feed drone dan HUD drone (baterai, status terbang, trim, speed, REC) digambar langsung di frame yang tampil di dashboard.
+
+### Setup
+
+1. Sambungkan Wi-Fi ke **Tello-XXXXXX** (internet akan mati selama terhubung — normal).
+2. Di `app.py`, ubah konstanta:
+
+```python
+CAMERA_TYPE = "tello"   # "webcam" | "tello" | "e99"
+CAMERA_SOURCE = "0"     # hanya dipakai jika CAMERA_TYPE = "webcam"
+```
+
+3. Jalankan seperti biasa: `python app.py`
+
+> `CAMERA_TYPE = "webcam"` (default) mempertahankan perilaku lama tanpa menyentuh drone sama sekali.
+
+### Keyboard Controls (fokus jendela/terminal server)
+
+| Tombol | Aksi |
+|--------|------|
+| W / A / S / D | Maju / Kiri / Mundur / Kanan |
+| Arrow Up / Down | Naik / Turun |
+| Arrow Left / Right | Yaw kiri / Yaw kanan |
+| **Space** | Takeoff / Land |
+| **Q** | Ambil foto (frame hasil deteksi APD) |
+| **E** | Mulai / Hentikan rekaman video |
+| **C** / **X** | Speed naik / turun (30/50/70/100%) |
+| **[** / **]** | Trim roll kiri / kanan |
+| **Tab** | Reset trim |
+| **G** | Tampilkan / sembunyikan grid rule of thirds |
+| **R** | Switch mode keyboard / gamepad |
+| **F** | Emergency land |
+
+### Gamepad Controls (XInput)
+
+| Input | Aksi |
+|-------|------|
+| Left stick | Yaw + Naik/Turun |
+| Right stick | Maju/Mundur/Kiri/Kanan |
+| **START** (< 0.8s) | Takeoff / Land |
+| **START** (>= 0.8s) | Emergency land |
+| **A** | Ambil foto |
+| **B** | Mulai / Hentikan rekaman video |
+| **LB** / **RB** | Speed turun / naik |
+| **BACK** | Reset trim |
+| **D-Pad** kiri/kanan | Trim roll kiri / kanan |
+
+### Safety
+
+- **Auto-land otomatis** saat baterai <= 10% (indikator kuning "LOW BATTERY" saat <= 20%).
+- Foto & rekaman disimpan di `captures/photos` dan `captures/videos` (frame hasil deteksi APD + HUD).
+
+### Troubleshooting Drone
+
+- **av DLL diblokir Windows Security**: pin `av<18` sudah ada di `requirements.txt`. Jika tetap diblokir, tambahkan pengecualian di Windows Security.
+- **Gagal konek ke Tello**: pastikan Wi-Fi terhubung ke Tello, matikan firewall/antivirus sementara.
+- **Video pixelated / lag 2-3 detik setelah takeoff**: batasan firmware Tello standard, bukan error.
+- **Kontrol keyboard tidak merespons**: pastikan fokus ada di mesin server (keyboard fisik), bukan di browser di perangkat lain.
+
+---
+
+## 📷 Mode Drone E88 Pro / E99 (Pasif)
+
+Mendukung drone murah keluarga **E88 Pro / E99** sebagai sumber kamera. Mode ini **pasif**: kontrol terbang tetap memakai **remote fisik bawaan drone**, program hanya menangani **video + deteksi APD + foto (Q) + rekaman (E)**.
+
+### Setup
+
+1. Sambungkan Wi-Fi ke **drone (192.168.1.1)** — remote fisik tetap bisa terbang karena RF, tidak konflik dengan Wi-Fi.
+2. Di `app.py`:
+
+```python
+CAMERA_TYPE = "e99"
+```
+
+3. Jalankan: `python app.py`
+
+### Karakteristik Mode E99
+
+- Video RTSP (`rtsp://192.168.1.1:7070/webcam`) dibaca via OpenCV, dirotasi 90° CW (sesuai orientasi kamera drone; matikan via `ROTATE = False` di `drone/e99_drone.py`).
+- **Tanpa telemetri**: HUD menampilkan `BAT --`, `ALT --`, `TM --`; **auto-land baterai tidak berlaku** (tidak ada API baterai).
+- Tombol **Q** (foto) & **E** (rekam) aktif dari keyboard mesin server; tombol kontrol terbang (Space/WASD dll.) tidak berlaku.
+- Deteksi APD, log pelanggaran, snapshot, dan zona berfungsi sama seperti mode lain.
 
 ---
 

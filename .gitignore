@@ -22,3 +22,7 @@ venv/
 # Ignore logs
 *.log
 logs/
+
+# Ignore drone captures
+captures/
+templates/
